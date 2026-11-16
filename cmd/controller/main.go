@@ -29,6 +29,10 @@ func main() {
 		fmt.Fprintf(w, `{"status": "success", "message": " Server Hoàng Kim Cốt đang chạy bằng net/http!"}`)
 	})
 
+	mux.HandleFunc("PUT /api/users/{student_id}", handler.UpdateUser)
+	mux.HandleFunc("DELETE /api/users/{student_id}", handler.DeleteUser)
+	mux.HandleFunc("DELETE /api/events/{event_id}", handler.DeleteEvent)
+
 	mux.HandleFunc("POST /api/users", handler.CreateUser)
 	mux.HandleFunc("GET /api/users/{student_id}", handler.GetUser)
 

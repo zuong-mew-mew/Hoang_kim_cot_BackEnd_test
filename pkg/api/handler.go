@@ -146,3 +146,62 @@ func (h *Handler) GetRegistrationsByEvent(w http.ResponseWriter, r *http.Request
 
 	json.NewEncoder(w).Encode(list)
 }
+
+// PUT /api/users/{student_id} (Sửa thông tin sinh viên)
+func (h *Handler) UpdateUser(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	studentID := r.PathValue("student_id")
+
+	var updateData map[string]interface{}
+	if err := json.NewDecoder(r.Body).Decode(&updateData); err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(map[string]string{"error": "Dữ liệu JSON không hợp lệ"})
+		return
+	}
+
+	err := h.repo.UpdateUser(r.Context(), studentID, updateData)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(map[string]string{"error": "Không thể cập nhật sinh viên"})
+		return
+	}
+
+	json.NewEncoder(w).Encode(map[string]string{"message": "Cập nhật sinh viên thành công!"})
+}
+
+// DELETE /api/users/{student_id} (Xóa sinh viên)
+func (h *Handler) DeleteUser(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	studentID := r.PathValue("student_id")
+
+	err := h.repo.DeleteUser(r.Context(), studentID)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(map[string]string{"error": "Không thể xóa sinh viên"})
+		return
+	}
+
+	json.NewEncoder(w).Encode(map[string]string{"message": "Xóa sinh viên thành công!"})
+}
+
+// DELETE /api/events/{event_id} (Xóa sự kiện)
+func (h *Handler) DeleteEvent(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	eventIDStr := r.PathValue("event_id")
+
+	eventID, err := primitive.ObjectIDFromHex(eventIDStr)
+	if err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(map[string]string{"error": "ID sự kiện không hợp lệ"})
+		return
+	}
+
+	err = h.repo.DeleteEvent(r.Context(), eventID)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(map[string]string{"error": "Không thể xóa sự kiện"})
+		return
+	}
+
+	json.NewEncoder(w).Encode(map[string]string{"message": "Xóa sự kiện thành công!"})
+}

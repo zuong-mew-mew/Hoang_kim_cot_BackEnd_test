@@ -4,43 +4,42 @@ import (
 	"context"
 	"fmt"
 	"log"
-
-	"github.com/gin-gonic/gin"
+	"net/http"
 
 	"hoang_kim_cot/pkg/api"
 	"hoang_kim_cot/pkg/database"
 )
 
 func main() {
-	uri := "mongodb+srv://gaulmtvn77_db_user:Gaulmtvn2026@cluster0.sqbjtgf.mongodb.net/?retryWrites=true&w=majority"
+	uri := ""
 
-	// 1. Kết nối MongoDB
 	client, err := database.ConnectMongoDB(uri)
 	if err != nil {
 		log.Fatalf("Lỗi kết nối DB: %v", err)
 	}
 	defer client.Disconnect(context.Background())
 
-	// 2. Khởi tạo Repo và Handler
 	repo := database.NewRepository(client, "iuh_event_db")
 	handler := api.NewHandler(repo)
 
-	// 3. Khởi tạo Gin Router
-	r := gin.Default()
+	mux := http.NewServeMux()
 
-	// 4. Đăng ký các đường link API
-	r.POST("/api/users", handler.CreateUser)
-	r.GET("/api/users/:student_id", handler.GetUser)
+	mux.HandleFunc("GET /", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		fmt.Fprintf(w, `{"status": "success", "message": " Server Hoàng Kim Cốt đang chạy bằng net/http!"}`)
+	})
 
-	r.POST("/api/events", handler.CreateEvent)
-	r.GET("/api/events", handler.GetEvents)
+	mux.HandleFunc("POST /api/users", handler.CreateUser)
+	mux.HandleFunc("GET /api/users/{student_id}", handler.GetUser)
 
-	r.POST("/api/registrations", handler.RegisterEvent)
-	r.GET("/api/registrations/event/:event_id", handler.GetRegistrationsByEvent)
+	mux.HandleFunc("POST /api/events", handler.CreateEvent)
+	mux.HandleFunc("GET /api/events", handler.GetEvents)
 
-	// 5. Bật server chạy tại cổng 8080
-	fmt.Println(" Server đang chạy tại: http://localhost:8080")
-	if err := r.Run(":8080"); err != nil {
+	mux.HandleFunc("POST /api/registrations", handler.RegisterEvent)
+	mux.HandleFunc("GET /api/registrations/event/{event_id}", handler.GetRegistrationsByEvent)
+
+	fmt.Println(" Server net/http đang chạy tại: http://localhost:8080")
+	if err := http.ListenAndServe(":8080", mux); err != nil {
 		log.Fatalf("Lỗi khởi động server: %v", err)
 	}
 }

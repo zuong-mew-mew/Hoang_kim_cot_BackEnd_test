@@ -1,0 +1,32 @@
+# ===== Bí mật — không bao giờ commit =====
+.env
+.env.*
+!.env.example
+serviceAccountKey.json
+*.pem
+*.key
+
+# ===== Go build =====
+*.exe
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+/bin/
+/dist/
+build/
+
+# ===== Log & file tạm =====
+*.log
+*.tmp
+/tmp/
+
+# ===== IDE & hệ điều hành =====
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+Desktop.ini

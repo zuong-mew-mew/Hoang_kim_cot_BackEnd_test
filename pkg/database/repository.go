@@ -22,6 +22,20 @@ func NewRepository(client *mongo.Client, dbName string) *Repository {
 	}
 }
 
+func (r *Repository) GetAllUsers(ctx context.Context) ([]model.User, error) {
+	cursor, err := r.db.Collection("users").Find(ctx, bson.M{})
+	if err != nil {
+		return nil, err
+	}
+	defer cursor.Close(ctx)
+
+	users := []model.User{}
+	if err := cursor.All(ctx, &users); err != nil {
+		return nil, err
+	}
+	return users, nil
+}
+
 // ================= USER  =================
 // Thêm User
 func (r *Repository) CreateUser(ctx context.Context, user *model.User) error {
@@ -86,10 +100,13 @@ func (r *Repository) DeleteEvent(ctx context.Context, eventID primitive.ObjectID
 
 // Lấy danh sách Event theo Khoa & Khóa
 func (r *Repository) GetEventsByMajorAndBatch(ctx context.Context, major string, batch int) ([]model.Event, error) {
-	filter := bson.M{
-		"major":  major,
-		"batch":  batch,
-		"status": "Open",
+	filter := bson.M{}
+	// Chỉ lọc theo major/batch khi có giá trị thật — không thì lấy tất cả.
+	if major != "" {
+		filter["major"] = major
+	}
+	if batch != 0 {
+		filter["batch"] = batch
 	}
 
 	cursor, err := r.db.Collection("events").Find(ctx, filter)
@@ -128,4 +145,96 @@ func (r *Repository) GetRegistrationsByEventID(ctx context.Context, eventID prim
 		return nil, err
 	}
 	return list, nil
+}
+
+// GetTopicStats đếm số sinh viên theo từng major và từng batch.
+func (r *Repository) GetTopicStats(ctx context.Context) (map[string]int, map[int]int, error) {
+	users, err := r.GetAllUsers(ctx)
+	if err != nil {
+		return nil, nil, err
+	}
+	byMajor := map[string]int{}
+	byBatch := map[int]int{}
+	for _, u := range users {
+		if u.Major != "" {
+			byMajor[u.Major]++
+		}
+		if u.Batch != 0 {
+			byBatch[u.Batch]++
+		}
+	}
+	return byMajor, byBatch, nil
+}
+
+
+// Lưu 1 log thông báo vào collection "notifications".
+func (r *Repository) SaveNotificationLog(ctx context.Context, log *model.NotificationLog) error {
+	log.SentAt = time.Now()
+	res, err := r.db.Collection("notifications").InsertOne(ctx, log)
+	if err != nil {
+		return err
+	}
+	if oid, ok := res.InsertedID.(primitive.ObjectID); ok {
+		log.ID = oid
+	}
+	return nil
+}
+
+// GetNotifications trả log mới nhất trước, tối đa 100 dòng.
+func (r *Repository) GetNotifications(ctx context.Context) ([]model.NotificationLog, error) {
+	opts := options.Find().SetSort(bson.D{{Key: "sent_at", Value: -1}}).SetLimit(100)
+	cursor, err := r.db.Collection("notifications").Find(ctx, bson.M{}, opts)
+	if err != nil {
+		return nil, err
+	}
+	defer cursor.Close(ctx)
+	logs := []model.NotificationLog{}
+	if err := cursor.All(ctx, &logs); err != nil {
+		return nil, err
+	}
+	return logs, nil
+}
+
+// GetEventByID lấy 1 event theo _id (để gửi thông báo theo event).
+func (r *Repository) GetEventByID(ctx context.Context, id primitive.ObjectID) (*model.Event, error) {
+	var event model.Event
+	if err := r.db.Collection("events").FindOne(ctx, bson.M{"_id": id}).Decode(&event); err != nil {
+		return nil, err
+	}
+	return &event, nil
+}
+
+// UpdateUserFCMToken lưu FCM token của 1 sinh viên (app gửi lên mỗi lần
+// đăng nhập và mỗi khi token đổi).
+func (r *Repository) UpdateUserFCMToken(ctx context.Context, studentID string, token string) error {
+	filter := bson.M{"student_id": studentID}
+	update := bson.M{"$set": bson.M{"fcm_token": token}}
+	_, err := r.db.Collection("users").UpdateOne(ctx, filter, update)
+	return err
+}
+
+// GetFCMTokensByMajorAndBatch trả token của các user khớp khoa + khóa,
+// chỉ lấy những user đã báo token lên.
+func (r *Repository) GetFCMTokensByMajorAndBatch(ctx context.Context, major string, batch int) ([]string, error) {
+	filter := bson.M{
+		"major":     major,
+		"batch":     batch,
+		"fcm_token": bson.M{"$ne": ""},
+	}
+	cursor, err := r.db.Collection("users").Find(ctx, filter)
+	if err != nil {
+		return nil, err
+	}
+	defer cursor.Close(ctx)
+	tokens := []string{}
+	for cursor.Next(ctx) {
+		var user model.User
+		if err := cursor.Decode(&user); err != nil {
+			return nil, err
+		}
+		if user.FCMToken != "" {
+			tokens = append(tokens, user.FCMToken)
+		}
+	}
+	return tokens, cursor.Err()
 }

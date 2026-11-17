@@ -17,4 +17,5 @@ type User struct {
 	Major        string             `bson:"major" json:"major"`
 	Batch        int                `bson:"batch" json:"batch"`
 	CreatedAt    time.Time          `bson:"created_at" json:"created_at"`
+	FCMToken 	 string  			`bson:"fcm_token,omitempty" json:"fcm_token,omitempty"`	
 }

@@ -11,7 +11,7 @@ import (
 )
 
 func main() {
-	uri := ""
+	uri := "mongodb+srv://gaulmtvn77_db_user:123@cluster0.sqbjtgf.mongodb.net/?retryWrites=true&w=majority"
 
 	client, err := database.ConnectMongoDB(uri)
 	if err != nil {
@@ -24,7 +24,7 @@ func main() {
 
 	mux := http.NewServeMux()
 
-	mux.HandleFunc("GET /", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("GET /{$}", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		fmt.Fprintf(w, `{"status": "success", "message": " Server Hoàng Kim Cốt đang chạy bằng net/http!"}`)
 	})

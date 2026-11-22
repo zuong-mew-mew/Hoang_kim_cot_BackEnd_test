@@ -1,0 +1,21 @@
+
+services:
+  hoang-kim-cot:
+    build:
+      context: .
+      dockerfile: Dockerfile
+
+    image: hoang-kim-cot:latest
+    container_name: hoang-kim-cot-be
+
+    restart: unless-stopped
+
+    env_file:
+      - .env
+
+    ports:
+      - "4000:8080"
+
+    volumes:
+      - ./cmd/controller/serviceAccountKey.json:/app/serviceAccountKey.json:ro
+

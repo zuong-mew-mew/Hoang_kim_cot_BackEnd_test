@@ -12,17 +12,24 @@ import (
 
 	"os"
 	"github.com/joho/godotenv"
+	"strings"
 )
 
 func withCORS(next http.Handler) http.Handler {
-	origin := os.Getenv("CORS_ORIGIN")
-	if origin == "" {
-		origin = "http://localhost:3000" // mặc định cho local
-	}
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Access-Control-Allow-Origin", "http://localhost:3000")
+		allowed := strings.Split(os.Getenv("CORS_ORIGIN"), ",")
+		if len(allowed) == 0 || allowed[0] == "" {
+			allowed = []string{"http://localhost:3000"}
+		}
+		origin := r.Header.Get("Origin")
+		for _, a := range allowed {
+			if strings.TrimSpace(a) == origin {
+				w.Header().Set("Access-Control-Allow-Origin", origin)
+				break
+			}
+		}
 		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS")
-		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
+		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization, ngrok-skip-browser-warning")
 		if r.Method == http.MethodOptions {
 			w.WriteHeader(http.StatusNoContent)
 			return
@@ -32,9 +39,7 @@ func withCORS(next http.Handler) http.Handler {
 }
 
 func main() {
-	for _, path := range []string{".env", "../../.env"} {
-		_ = godotenv.Load(path)
-	}
+	_ = godotenv.Load(".env", "../../.env")
 
 	uri := os.Getenv("MONGO_URI")
 	if uri == "" {
@@ -50,8 +55,8 @@ func main() {
 	repo := database.NewRepository(client, "iuh_event_db")
 	handler := api.NewHandler(repo)
 
-	// FCM: thiếu file key thì BE vẫn chạy, chỉ không gửi được (endpoint báo 503).
 	ctx := context.Background()
+
 	if notifyClient, err := notify.New(ctx, os.Getenv("FIREBASE_CREDENTIALS")); err != nil {
 		log.Printf("FCM init lỗi: %v", err)
 	} else {
@@ -67,7 +72,7 @@ func main() {
 
 	mux.HandleFunc("GET /{$}", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		fmt.Fprintf(w, `{"status": "success", "message": " Server Hoàng Kim Cốt đang chạy bằng net/http!"}`)
+		fmt.Fprintf(w, `{"status": "success", "message": "Server Hoàng Kim Cốt đang chạy bằng net/http!"}`)
 	})
 
 	mux.HandleFunc("POST /api/auth/login", handler.Login)
@@ -91,8 +96,16 @@ func main() {
 	mux.HandleFunc("GET /api/notifications", handler.GetNotifications)
 	mux.HandleFunc("POST /api/users/{student_id}/fcm-token", handler.UpdateFCMToken)
 
-	fmt.Println(" Server net/http đang chạy tại: http://localhost:8080")
-	if err := http.ListenAndServe(":8080", withCORS(mux)); err != nil {
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = "8080"
+	}
+
+	addr := ":" + port
+
+	fmt.Printf("Server net/http đang chạy tại: %s\n", addr)
+
+	if err := http.ListenAndServe(addr, withCORS(mux)); err != nil {
 		log.Fatalf("Lỗi khởi động server: %v", err)
 	}
 }
